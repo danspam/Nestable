@@ -33,22 +33,17 @@
     var defaults = {
             listNodeName    : 'ol',
             itemNodeName    : 'li',
-            rootClass       : 'dd',
-            listClass       : 'dd-list',
-            itemClass       : 'dd-item',
-            dragClass       : 'dd-dragel',
-            handleClass     : 'dd-handle',
-            collapsedClass  : 'dd-collapsed',
-            placeClass      : 'dd-placeholder',
-            noDragClass     : 'dd-nodrag',
-            noChildrenClass : 'dd-nochildren',
-            emptyClass      : 'dd-empty',
-            expandBtnHTML   : '<button data-action="expand" type="button">Expand</button>',
-            collapseBtnHTML : '<button data-action="collapse" type="button">Collapse</button>',
-            group           : 0,
-            maxDepth        : 5,
-            threshold       : 20,
-            fixed           : false
+            rootClass       : 'sort-container',
+            listClass       : 'sort-list',
+            itemClass       : 'sort-item',
+            dragClass       : 'sort-drag',
+            handleClass     : 'sort-handle',
+            placeClass      : 'sort-placeholder',
+            noDragClass     : 'sort-no-drag',
+            noChildrenClass : 'sort-no-children',
+            emptyClass      : 'sort-empty',
+            maxDepth        : 150,
+            threshold       : 20
         };
 
     function Plugin(element, options)
@@ -67,33 +62,7 @@
 
             list.reset();
 
-            list.el.data('nestable-group', this.options.group);
-
-            list.placeEl = $('<div class="' + list.options.placeClass + '"/>');
-
-            $.each(this.el.find(list.options.itemNodeName), function(k, el) {
-                var item = $(el),
-                parent = item.parent();
-                list.setParent(item);
-                if (parent.hasClass(list.options.collapsedClass)) {
-                   list.collapseItem(parent.parent());
-                }
-            });
-
-            list.el.on('click', 'button', function(e) {
-                if (list.dragEl || (!hasTouch && e.button !== 0)) {
-                    return;
-                }
-                var target = $(e.currentTarget),
-                    action = target.data('action'),
-                    item   = target.parent(list.options.itemNodeName);
-                if (action === 'collapse') {
-                    list.collapseItem(item);
-                }
-                if (action === 'expand') {
-                    list.expandItem(item);
-                }
-            });
+            list.placeEl = $('<li class="' + list.options.placeClass + '"/>');
 
             var onStartEvent = function(e)
             {
@@ -163,11 +132,6 @@
                 };
             data = step(list.el.find(list.options.listNodeName).first(), depth);
             return data;
-        },
-
-        returnOptions: function()
-        {
-            return this.options;
         },
 
         toArray: function()
@@ -250,58 +214,11 @@
             this.dragEl     = null;
             this.dragRootEl = null;
             this.dragDepth  = 0;
-            this.hasNewRoot = false;
             this.pointEl    = null;
-        },
-
-        expandItem: function(li)
-        {
-            li.removeClass(this.options.collapsedClass);
-            li.children('[data-action="expand"]').hide();
-            li.children('[data-action="collapse"]').show();
-            li.children(this.options.listNodeName).show();
-        },
-
-        collapseItem: function(li)
-        {
-            var lists = li.children(this.options.listNodeName);
-            if (lists.length) {
-                li.addClass(this.options.collapsedClass);
-                li.children('[data-action="collapse"]').hide();
-                li.children('[data-action="expand"]').show();
-                li.children(this.options.listNodeName).hide();
-            }
-        },
-
-        expandAll: function()
-        {
-            var list = this;
-            list.el.find(list.options.itemNodeName).each(function() {
-                list.expandItem($(this));
-            });
-        },
-
-        collapseAll: function()
-        {
-            var list = this;
-            list.el.find(list.options.itemNodeName).each(function() {
-                list.collapseItem($(this));
-            });
-        },
-
-        setParent: function(li)
-        {
-            if (li.children(this.options.listNodeName).length) {
-                li.prepend($(this.options.expandBtnHTML));
-                li.prepend($(this.options.collapseBtnHTML));
-            }
-            li.children('[data-action="expand"]').hide();
         },
 
         unsetParent: function(li)
         {
-            li.removeClass(this.options.collapsedClass);
-            li.children('[data-action]').remove();
             li.children(this.options.listNodeName).remove();
         },
 
@@ -399,19 +316,7 @@
             el[0].parentNode.removeChild(el[0]);
             this.placeEl.replaceWith(el);
 
-            if (this.hasNewRoot) {
-                if (this.options.fixed === true)
-                {
-                    this.restoreItemAtIndex(el);
-                }
-                else {
-                    this.el.trigger('lostItem');
-                }
-                this.dragRootEl.trigger('gainedItem');
-            }
-            else {
-                this.dragRootEl.trigger('change');
-            }
+            this.dragRootEl.trigger('change');
 
             this.dragEl.remove();
 
@@ -477,8 +382,8 @@
                 // reset move distance on x-axis for new phase
                 mouse.distAxX = 0;
                 prev = this.placeEl.prev(opt.itemNodeName);
-                // increase horizontal level if previous sibling exists, is not collapsed, and can have children
-                if (mouse.distX > 0 && prev.length && !prev.hasClass(opt.collapsedClass) && !prev.hasClass(opt.noChildrenClass)) {
+                // increase horizontal level if previous sibling exists and can have children
+                if (mouse.distX > 0 && prev.length && !prev.hasClass(opt.noChildrenClass)) {
                     // cannot increase level when item above is collapsed
                     list = prev.find(opt.listNodeName).last();
                     // check if depth limit has reached
@@ -531,18 +436,10 @@
                 return;
             }
 
-            // find parent list of item under cursor
-            var pointElRoot = this.pointEl.closest('.' + opt.rootClass),
-                isNewRoot   = this.dragRootEl.data('nestable-id') !== pointElRoot.data('nestable-id');
-
             /**
              * move vertical
              */
-            if (!mouse.dirAx || isNewRoot || isEmpty) {
-                // check if groups match if dragging over new root
-                if (isNewRoot && opt.group !== pointElRoot.data('nestable-group')) {
-                    return;
-                }
+            if (!mouse.dirAx || isEmpty) {
                 // check depth limit
                 depth = this.dragDepth - 1 + this.pointEl.parents(opt.listNodeName).length;
                 if (depth > opt.maxDepth) {
@@ -568,11 +465,6 @@
                 if (!this.dragRootEl.find(opt.itemNodeName).length) {
                     this.dragRootEl.append('<div class="' + opt.emptyClass + '"/>');
                 }
-                // parent root list has changed
-                this.dragRootEl = pointElRoot;
-                if (isNewRoot) {
-                    this.hasNewRoot = this.el[0] !== this.dragRootEl[0];
-                }
             }
         }
 
@@ -583,20 +475,12 @@
         var lists  = this,
             retval = this;
 
-        if ( ! ('Nestable' in window))
-        {
-            window.Nestable = {};
-            Nestable.counter = 0;
-        }
-
         lists.each(function()
         {
             var plugin = $(this).data("nestable");
 
             if (!plugin) {
-                Nestable.counter++;
                 $(this).data("nestable", new Plugin(this, params));
-                $(this).data("nestable-id", Nestable.counter);
 
             } else {
                 if (typeof params === 'string' && typeof plugin[params] === 'function') {
